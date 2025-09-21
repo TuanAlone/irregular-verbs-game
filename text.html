@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đấu Bài Co-op</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: white;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #FFD700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        
+        .screen {
+            display: none;
+        }
+        
+        .active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #FFD700;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #FFC400;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .code-display {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #FFD700;
+        }
+        
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .players {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .player {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 150px;
+        }
+        
+        .player.active {
+            border: 2px solid #FFD700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+        
+        .player-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .cards {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .card {
+            width: 40px;
+            height: 60px;
+            background: white;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: black;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card.red {
+            color: red;
+        }
+        
+        .game-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .game-controls button {
+            width: auto;
+            min-width: 120px;
+        }
+        
+        .chat-box {
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+        }
+        
+        .message {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .message.system {
+            color: #FFD700;
+            font-style: italic;
+        }
+        
+        .chat-input {
+            display: flex;
+            margin-top: 10px;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+        }
+        
+        .chat-input button {
+            width: auto;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>♠️♥️ ĐẤU BÀI CO-OP ♦️♣️</h1>
+        
+        <!-- Màn hình chính -->
+        <div id="main-screen" class="screen active">
+            <button id="create-room-btn">Tạo phòng mới</button>
+            <div style="text-align: center; margin: 15px 0;">HOẶC</div>
+            <div class="form-group">
+                <label for="room-code">Nhập mã phòng:</label>
+                <input type="text" id="room-code" placeholder="Nhập 6 chữ số" maxlength="6">
+            </div>
+            <div class="form-group">
+                <label for="player-name">Tên người chơi:</label>
+                <input type="text" id="player-name" placeholder="Tên của bạn" maxlength="15">
+            </div>
+            <button id="join-room-btn">Vào phòng</button>
+        </div>
+        
+        <!-- Màn hình chờ -->
+        <div id="waiting-screen" class="screen">
+            <h2>Đang chờ người chơi...</h2>
+            <div class="code-display" id="display-room-code">123456</div>
+            <p>Chia sẻ mã này với bạn bè để họ tham gia phòng!</p>
+            <div id="players-list"></div>
+            <button id="start-game-btn">Bắt đầu game</button>
+            <button id="exit-waiting-btn">Thoát</button>
+        </div>
+        
+        <!-- Màn hình chơi game -->
+        <div id="game-screen" class="screen">
+            <h2>Phòng: <span id="game-room-code"></span></h2>
+            
+            <div class="game-area">
+                <div class="players" id="game-players">
+                    <!-- Người chơi sẽ được thêm bằng JavaScript -->
+                </div>
+                
+                <div class="game-controls">
+                    <button id="play-card-btn">Đánh bài</button>
+                    <button id="draw-card-btn">Rút bài</button>
+                </div>
+                
+                <div class="chat-box" id="chat-messages">
+                    <div class="message system">Chào mừng đến với game đấu bài!</div>
+                </div>
+                
+                <div class="chat-input">
+                    <input type="text" id="chat-input" placeholder="Nhắn tin...">
+                    <button id="send-message-btn">Gửi</button>
+                </div>
+                
+                <button id="exit-game-btn">Thoát game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Các phần tử DOM
+        const mainScreen = document.getElementById('main-screen');
+        const waitingScreen = document.getElementById('waiting-screen');
+        const gameScreen = document.getElementById('game-screen');
+        
+        const roomCodeInput = document.getElementById('room-code');
+        const playerNameInput = document.getElementById('player-name');
+        const displayRoomCode = document.getElementById('display-room-code');
+        const playersList = document.getElementById('players-list');
+        const gameRoomCode = document.getElementById('game-room-code');
+        const gamePlayers = document.getElementById('game-players');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        
+        // Nút bấm
+        const createRoomBtn = document.getElementById('create-room-btn');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const exitWaitingBtn = document.getElementById('exit-waiting-btn');
+        const playCardBtn = document.getElementById('play-card-btn');
+        const drawCardBtn = document.getElementById('draw-card-btn');
+        const sendMessageBtn = document.getElementById('send-message-btn');
+        const exitGameBtn = document.getElementById('exit-game-btn');
+        
+        // Biến toàn cục
+        let currentRoomCode = '';
+        let currentPlayer = '';
+        let players = [];
+        let cards = [];
+        
+        // Tạo phòng mới
+        createRoomBtn.addEventListener('click', () => {
+            const playerName = playerNameInput.value.trim();
+            if (!playerName) {
+                alert('Vui lòng nhập tên người chơi!');
+                return;
+            }
+            
+            currentPlayer = playerName;
+            currentRoomCode = generateRoomCode();
+            
+            // Chuyển đến màn hình chờ
+            displayRoomCode.textContent = currentRoomCode;
+            players = [{ name: playerName, isHost: true }];
+            updatePlayersList();
+            
+            showScreen(waitingScreen);
+            addChatMessage('Hệ thống', `Phòng ${currentRoomCode} đã được tạo. Chờ người chơi khác...`, true);
+        });
+        
+        // Tham gia phòng
+        joinRoomBtn.addEventListener('click', () => {
+            const code = roomCodeInput.value.trim();
+            const playerName = playerNameInput.value.trim();
+            
+            if (!code || code.length !== 6) {
+                alert('Mã phòng phải có 6 chữ số!');
+                return;
+            }
+            
+            if (!playerName) {
+                alert('Vui lòng nhập tên người chơi!');
+                return;
+            }
+            
+            currentRoomCode = code;
+            currentPlayer = playerName;
+            
+            // Giả lập tham gia phòng (trong thực tế sẽ gọi API)
+            players = [
+                { name: 'Người chơi 1', isHost: true },
+                { name: playerName, isHost: false }
+            ];
+            
+            displayRoomCode.textContent = currentRoomCode;
+            updatePlayersList();
+            
+            showScreen(waitingScreen);
+            addChatMessage('Hệ thống', `Bạn đã tham gia phòng ${currentRoomCode}.`, true);
+            addChatMessage('Hệ thống', 'Đang chờ chủ phòng bắt đầu game...', true);
+        });
+        
+        // Bắt đầu game
+        startGameBtn.addEventListener('click', () => {
+            // Khởi tạo game
+            gameRoomCode.textContent = currentRoomCode;
+            initializeGame();
+            showScreen(gameScreen);
+        });
+        
+        // Thoát phòng chờ
+        exitWaitingBtn.addEventListener('click', () => {
+            showScreen(mainScreen);
+        });
+        
+        // Thoát game
+        exitGameBtn.addEventListener('click', () => {
+            showScreen(mainScreen);
+        });
+        
+        // Đánh bài
+        playCardBtn.addEventListener('click', () => {
+            if (cards.length > 0) {
+                const playedCard = cards.pop();
+                addChatMessage(currentPlayer, `đã đánh lá bài ${playedCard}`);
+                updatePlayerCards();
+            } else {
+                alert('Bạn không còn bài để đánh!');
+            }
+        });
+        
+        // Rút bài
+        drawCardBtn.addEventListener('click', () => {
+            const newCard = drawRandomCard();
+            cards.push(newCard);
+            addChatMessage(currentPlayer, `đã rút một lá bài`);
+            updatePlayerCards();
+        });
+        
+        // Gửi tin nhắn
+        sendMessageBtn.addEventListener('click', sendChatMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+        
+        // Hàm utility
+        function showScreen(screen) {
+            mainScreen.classList.remove('active');
+            waitingScreen.classList.remove('active');
+            gameScreen.classList.remove('active');
+            screen.classList.add('active');
+        }
+        
+        function generateRoomCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+        
+        function updatePlayersList() {
+            playersList.innerHTML = '';
+            players.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'player';
+                playerEl.innerHTML = `
+                    <div class="player-name">${player.name} ${player.isHost ? '(Chủ phòng)' : ''}</div>
+                `;
+                playersList.appendChild(playerEl);
+            });
+        }
+        
+        function addChatMessage(sender, message, isSystem = false) {
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${isSystem ? 'system' : ''}`;
+            messageEl.innerHTML = isSystem 
+                ? `<strong>${message}</strong>`
+                : `<strong>${sender}:</strong> ${message}`;
+            chatMessages.appendChild(messageEl);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        function sendChatMessage() {
+            const message = chatInput.value.trim();
+            if (message) {
+                addChatMessage(currentPlayer, message);
+                chatInput.value = '';
+            }
+        }
+        
+        function initializeGame() {
+            // Khởi tạo bài cho người chơi
+            cards = [];
+            for (let i = 0; i < 5; i++) {
+                cards.push(drawRandomCard());
+            }
+            
+            // Hiển thị người chơi
+            gamePlayers.innerHTML = '';
+            players.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.className = `player ${player.name === currentPlayer ? 'active' : ''}`;
+                playerEl.innerHTML = `
+                    <div class="player-name">${player.name} ${player.isHost ? '(Chủ phòng)' : ''}</div>
+                    <div class="cards">
+                        ${player.name === currentPlayer 
+                            ? generateCardsHTML(cards) 
+                            : generateBackCardsHTML(5)}
+                    </div>
+                `;
+                gamePlayers.appendChild(playerEl);
+            });
+            
+            addChatMessage('Hệ thống', 'Game đã bắt đầu! Mỗi người có 5 lá bài.', true);
+        }
+        
+        function drawRandomCard() {
+            const suits = ['♠', '♥', '♦', '♣'];
+            const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+            const suit = suits[Math.floor(Math.random() * suits.length)];
+            const value = values[Math.floor(Math.random() * values.length)];
+            return { suit, value };
+        }
+        
+        function generateCardsHTML(cards) {
+            return cards.map(card => {
+                const isRed = card.suit === '♥' || card.suit === '♦';
+                return `<div class="card ${isRed ? 'red' : ''}">${card.value}${card.suit}</div>`;
+            }).join('');
+        }
+        
+        function generateBackCardsHTML(count) {
+            return Array(count).fill('<div class="card" style="background: #1a2a6c;">?</div>').join('');
+        }
+        
+        function updatePlayerCards() {
+            const currentPlayerEl = gamePlayers.querySelector('.player.active');
+            if (currentPlayerEl) {
+                currentPlayerEl.querySelector('.cards').innerHTML = generateCardsHTML(cards);
+            }
+        }
+    </script>
+</body>
+</html>
