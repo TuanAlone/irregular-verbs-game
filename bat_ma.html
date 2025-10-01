@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Game Bắt Ma - Halloween</title>
+  <style>
+    :root{--bg:#0b0b12;--panel:#111216;--accent:#ff8c00}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial;background:linear-gradient(180deg,#03010a 0%, #0b0812 60%);color:#fff}
+    .app{display:flex;gap:20px;align-items:flex-start;justify-content:center;padding:24px}
+    .game-wrap{position:relative;width:900px;height:600px;border-radius:12px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.7);background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="100%" height="100%" fill="%23070a0f"/></svg>') center/cover no-repeat}
+    canvas{display:block;background:linear-gradient(180deg, rgba(10,6,18,0.9), rgba(0,0,0,0.9));}
+    .ui{width:300px}
+    .panel{background:rgba(17,17,22,.85);padding:16px;border-radius:10px;border:1px solid rgba(255,255,255,.03)}
+    h1{margin:0 0 8px;font-size:20px}
+    label{display:block;margin:8px 0;font-size:14px}
+    select,input[type=radio]{width:100%;padding:8px;margin-top:6px;border-radius:6px;border:1px solid rgba(255,255,255,.06);background:#0e0e12;color:#fff}
+    button{margin-top:12px;padding:10px 12px;border-radius:8px;border:0;background:var(--accent);color:#111;font-weight:700;cursor:pointer}
+    .small{font-size:13px;color:#bbb}
+    .footer{margin-top:12px;font-size:13px;color:#cfcfcf}
+    .center{display:flex;align-items:center;gap:8px}
+    .controls{margin-top:12px;font-size:13px}
+    /* result overlay */
+    .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);flex-direction:column}
+    .overlay h2{font-size:36px;margin:0}
+    .overlay p{margin:8px 0 16px}
+    .hint{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.5);padding:6px 10px;border-radius:6px;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="game-wrap panel" id="gameWrap">
+      <canvas id="game" width="900" height="600"></canvas>
+      <div class="hint" id="hint">WASD: di chuyển (người bắt) / Mũi tên: di chuyển (nếu bạn là ma)</div>
+      <!-- overlay created dynamically -->
+    </div>
+
+    <div class="ui">
+      <div class="panel">
+        <h1>Game Bắt Ma - Halloween</h1>
+        <div class="small">Chủ đề: Halloween — Vật cản, đèn pin, bot</div>
+
+        <label>Chọn vai trò</label>
+        <select id="roleSelect">
+          <option value="hunter">Bạn là Người bắt ma (cầm đèn pin)</option>
+          <option value="ghost">Bạn là Ma</option>
+        </select>
+
+        <label>Thời gian chơi</label>
+        <select id="timeSelect">
+          <option value="10">10 giây</option>
+          <option value="20">20 giây</option>
+          <option value="30">30 giây</option>
+          <option value="60">1 phút</option>
+        </select>
+
+        <label>Số lượng ma (bot)</label>
+        <select id="numGhosts">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+        </select>
+
+        <div class="controls">
+          <label class="small">Khi bạn là "Người bắt": điều khiển bằng WASD. Khi bạn là "Ma": mũi tên.</label>
+          <label class="small">Những con ma bot sẽ di chuyển tự động; nếu là người bắt, bật đèn pin để bắt ma.</label>
+        </div>
+
+        <button id="startBtn">Bắt đầu</button>
+        <button id="resetBtn" style="background:#333;color:#fff;margin-left:8px">Reset</button>
+
+        <div class="footer">Hướng dẫn nhanh:<br>Người bắt dùng đèn pin (nón ánh sáng). Nếu đèn chiếu trúng ma => Bắt được. Nếu hết giờ mà ma còn sống => Ma thắng.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ====== CONFIG ====== */
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    // UI refs
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const roleSelect = document.getElementById('roleSelect');
+    const timeSelect = document.getElementById('timeSelect');
+    const numGhosts = document.getElementById('numGhosts');
+    const gameWrap = document.getElementById('gameWrap');
+
+    // game state
+    let game = null;
+
+    function rand(min,max){return Math.random()*(max-min)+min}
+    function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+    /* ====== ENTITIES ====== */
+    class Entity{
+      constructor(x,y,w,h,color){this.x=x;this.y=y;this.w=w;this.h=h;this.color=color;this.vx=0;this.vy=0}
+      rect(){return {x:this.x,y:this.y,w:this.w,h:this.h}} 
+      center(){return {x:this.x+this.w/2,y:this.y+this.h/2}}
+      draw(){ctx.fillStyle=this.color; ctx.fillRect(this.x,this.y,this.w,this.h)}
+      intersects(other){return !(this.x+this.w<other.x||this.x>other.x+other.w||this.y+this.h<other.y||this.y>other.y+other.h)}
+    }
+
+    /* ====== GAME CLASS ====== */
+    class Game{
+      constructor(){
+        this.role = 'hunter';
+        this.duration = 30; // seconds
+        this.timer = 0;
+        this.running = false;
+        this.player = null;
+        this.ghosts = [];
+        this.obstacles = [];
+        this.startTime = 0;
+        this.caught = false; // for hunter catching a ghost
+        this.resultShown = false;
+        this.keys = {};
+        this.numGhosts = 3;
+        this.flashAngle = Math.PI/5; // cone half-angle
+        this.flashDistance = 220;
+        this.hunterSpeed = 4.2;
+        this.ghostSpeed = 2.6;
+        this.botHunterSpeed = 3.4;
+        this.lastUpdate = performance.now();
+
+        // bind
+        window.addEventListener('keydown', e=>this.keys[e.key.toLowerCase()]=true);
+        window.addEventListener('keyup', e=>this.keys[e.key.toLowerCase()]=false);
+      }
+
+      initFromUI(){
+        this.role = roleSelect.value;
+        this.duration = parseInt(timeSelect.value,10);
+        this.numGhosts = parseInt(numGhosts.value,10);
+
+        // create obstacles
+        this.obstacles = [];
+        const obsCount = 6;
+        for(let i=0;i<obsCount;i++){
+          const w = Math.round(rand(60,140)), h=Math.round(rand(30,120));
+          const x = Math.round(rand(100, W-100-w));
+          const y = Math.round(rand(80, H-80-h));
+          this.obstacles.push(new Entity(x,y,w,h,'#2b2b2b'));
+        }
+
+        // create player and bots according to role
+        if(this.role==='hunter'){
+          // player is hunter
+          this.player = new Entity(80, H/2-20, 36,36, '#fff');
+          this.player.type='hunter';
+
+          // ghosts
+          this.ghosts = [];
+          for(let i=0;i<this.numGhosts;i++){
+            const g = new Entity(rand(300,W-80), rand(60,H-60), 34,34, '#ff5976');
+            g.type='ghost'; g.aiTime=0; g.direction = rand(0,Math.PI*2);
+            this.ghosts.push(g);
+          }
+        } else {
+          // player is ghost
+          this.player = new Entity(80, H/2-20, 34,34, '#ff5976');
+          this.player.type='ghost';
+
+          // create one bot hunter
+          this.ghosts = [];
+          const hunterBot = new Entity(rand(300,W-80), rand(60,H-60), 36,36, '#fff');
+          hunterBot.type='botHunter';
+          hunterBot.aiTime=0;
+          this.ghosts.push(hunterBot);
+
+          // add extra ghosts as bots? user asked number of ghosts when player chooses — if player is ghost, other ghosts can be bots to support
+          for(let i=1;i<this.numGhosts;i++){
+            const g = new Entity(rand(300,W-80), rand(60,H-60), 34,34, '#ff5976'); g.type='ghost'; g.aiTime=0; g.direction=rand(0,Math.PI*2);
+            this.ghosts.push(g);
+          }
+        }
+
+        this.startTime = performance.now();
+        this.timer = this.duration;
+        this.running = true;
+        this.caught = false;
+        this.resultShown = false;
+        this.lastUpdate = performance.now();
+      }
+
+      update(dt){
+        if(!this.running) return;
+        // update timer
+        const elapsed = (performance.now() - this.startTime)/1000;
+        this.timer = Math.max(0, this.duration - Math.floor(elapsed));
+
+        // player control
+        if(this.player.type==='hunter'){
+          let vx=0, vy=0;
+          if(this.keys['w']) vy-=1; if(this.keys['s']) vy+=1; if(this.keys['a']) vx-=1; if(this.keys['d']) vx+=1;
+          const mag = Math.hypot(vx,vy) || 1;
+          this.player.x += vx/mag*this.hunterSpeed;
+          this.player.y += vy/mag*this.hunterSpeed;
+        } else { // player ghost
+          let vx=0, vy=0;
+          if(this.keys['arrowup']) vy-=1; if(this.keys['arrowdown']) vy+=1; if(this.keys['arrowleft']) vx-=1; if(this.keys['arrowright']) vx+=1;
+          const mag = Math.hypot(vx,vy) || 1;
+          this.player.x += vx/mag*this.ghostSpeed*1.2;
+          this.player.y += vy/mag*this.ghostSpeed*1.2;
+        }
+
+        // clamp inside
+        this.player.x = clamp(this.player.x, 10, W - this.player.w - 10);
+        this.player.y = clamp(this.player.y, 10, H - this.player.h - 10);
+
+        // bots AI
+        for(const e of this.ghosts){
+          if(e.type==='ghost'){
+            // random wandering, avoid hunter's flashlight if hunter exists
+            e.aiTime -= dt;
+            if(e.aiTime<=0){ e.direction = rand(0,Math.PI*2); e.aiTime = rand(0.6,1.8); }
+            // move
+            e.x += Math.cos(e.direction)*this.ghostSpeed;
+            e.y += Math.sin(e.direction)*this.ghostSpeed;
+            // bounce off walls
+            if(e.x<10||e.x>W-e.w-10) e.direction = Math.PI - e.direction;
+            if(e.y<10||e.y>H-e.h-10) e.direction = -e.direction;
+
+            // if player is hunter, ghosts try to run away from flashlight cone center
+            const hunter = (this.player.type==='hunter') ? this.player : this.ghosts.find(x=>x.type==='botHunter');
+            if(hunter){
+              const inFlash = this.pointInFlash(e.center().x, e.center().y, hunter);
+              if(inFlash){
+                // run away
+                const cx = e.center().x, cy=e.center().y; const hx=hunter.center().x, hy=hunter.center().y;
+                const ang = Math.atan2(cy-hy, cx-hx);
+                e.x += Math.cos(ang)*this.ghostSpeed*2;
+                e.y += Math.sin(ang)*this.ghostSpeed*2;
+              }
+            }
+
+            // avoid obstacles simple
+            for(const o of this.obstacles){ if(e.intersects(o)){
+                // push back
+                e.x += rand(-30,30); e.y += rand(-30,30);
+              }}
+
+            // clamp
+            e.x = clamp(e.x, 10, W - e.w - 10);
+            e.y = clamp(e.y, 10, H - e.h - 10);
+
+          } else if(e.type==='botHunter'){
+            // chase nearest ghost
+            e.aiTime -= dt;
+            const target = this.ghosts.find(g=>g.type==='ghost');
+            if(target){
+              const dx = target.center().x - e.center().x; const dy = target.center().y - e.center().y;
+              const d = Math.hypot(dx,dy) || 1;
+              e.x += (dx/d)*this.botHunterSpeed; e.y += (dy/d)*this.botHunterSpeed;
+            } else {
+              // roam
+              if(e.aiTime<=0){ e.aiTime=rand(0.5,1.5); e.vx = rand(-1,1); e.vy=rand(-1,1);} 
+              e.x += e.vx*this.botHunterSpeed; e.y += e.vy*this.botHunterSpeed;
+            }
+            // clamp
+            e.x = clamp(e.x, 10, W - e.w - 10);
+            e.y = clamp(e.y, 10, H - e.h - 10);
+          }
+        }
+
+        // simple collision with obstacles for player
+        for(const o of this.obstacles){
+          if(this.player.intersects(o)){
+            // push player out by reversing last movement
+            // crude fix: move player away from center of obstacle
+            const cx = this.player.x + this.player.w/2, cy = this.player.y + this.player.h/2;
+            const ox = o.x + o.w/2, oy = o.y + o.h/2;
+            const ang = Math.atan2(cy-oy, cx-ox);
+            this.player.x += Math.cos(ang)*6; this.player.y += Math.sin(ang)*6;
+          }
+        }
+
+        // check catching: if hunter's flash intersects ghost center
+        const hunter = (this.player.type==='hunter') ? this.player : this.ghosts.find(x=>x.type==='botHunter');
+        if(hunter){
+          for(const g of this.ghosts.filter(x=>x.type==='ghost')){
+            if(this.pointInFlash(g.center().x, g.center().y, hunter)){
+              // caught
+              this.caught = true;
+              this.running = false;
+              break;
+            }
+          }
+        }
+
+        // if timer ended
+        if(this.timer<=0){ this.running=false; }
+      }
+
+      pointInFlash(px,py,hunter){
+        // hunter center and facing direction determined by last move keys
+        const hc = hunter.center();
+        // determine facing angle from keys or velocity
+        let fx=0, fy=0;
+        if(hunter.type==='hunter'){
+          if(this.keys['w']) fy-=1; if(this.keys['s']) fy+=1; if(this.keys['a']) fx-=1; if(this.keys['d']) fx+=1;
+        } else {
+          // bot hunter faces to nearest ghost
+          const t = this.ghosts.find(g=>g.type==='ghost'); if(t){fx = t.center().x-hc.x; fy = t.center().y-hc.y;} 
+        }
+        if(fx===0 && fy===0){ // default facing right
+          fx = 1; fy = 0;
+        }
+        const ang = Math.atan2(fy,fx);
+        const dx = px-hc.x, dy = py-hc.y;
+        const dist = Math.hypot(dx,dy);
+        if(dist>this.flashDistance) return false;
+        const ang2 = Math.atan2(dy,dx);
+        let diff = Math.abs(((ang2-ang)+Math.PI*3)%(Math.PI*2)-Math.PI);
+        return diff <= this.flashAngle;
+      }
+
+      draw(){
+        // background spooky
+        ctx.clearRect(0,0,W,H);
+        // subtle ground
+        const g = ctx.createLinearGradient(0,H*0.6,0,H);
+        g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.6)');
+        ctx.fillStyle = 'rgba(6,8,18,1)'; ctx.fillRect(0,0,W,H);
+
+        // draw moon & pumpkins as simple shapes
+        ctx.fillStyle='#f6e27a'; ctx.beginPath(); ctx.arc(W-120,80,48,0,Math.PI*2); ctx.fill();
+        // ground fog
+        ctx.fillStyle='rgba(30,10,40,0.25)'; ctx.fillRect(0,H-80,W,80);
+
+        // draw obstacles
+        for(const o of this.obstacles){ ctx.fillStyle=o.color; roundRect(ctx,o.x,o.y,o.w,o.h,8); }
+
+        // draw entities
+        // hunter's flashlight cone if hunter exists
+        const hunter = (this.player.type==='hunter') ? this.player : this.ghosts.find(x=>x.type==='botHunter');
+        if(hunter){
+          // compute facing
+          const hc = hunter.center();
+          let fx=0, fy=0;
+          if(hunter.type==='hunter'){
+            if(this.keys['w']) fy-=1; if(this.keys['s']) fy+=1; if(this.keys['a']) fx-=1; if(this.keys['d']) fx+=1;
+          } else {
+            const t = this.ghosts.find(g=>g.type==='ghost'); if(t){fx = t.center().x-hc.x; fy = t.center().y-hc.y;} }
+          if(fx===0 && fy===0){fx=1;fy=0}
+          const ang = Math.atan2(fy,fx);
+
+          // draw cone
+          ctx.save();
+          ctx.translate(hc.x, hc.y);
+          ctx.rotate(ang);
+          // gradient cone
+          const grad = ctx.createLinearGradient(0,0,this.flashDistance,0);
+          grad.addColorStop(0,'rgba(255,255,180,0.9)');
+          grad.addColorStop(1,'rgba(255,255,180,0.0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.moveTo(0,0);
+          ctx.lineTo(this.flashDistance*Math.cos(this.flashAngle), this.flashDistance*Math.sin(this.flashAngle));
+          ctx.arc(0,0,this.flashDistance, -this.flashAngle, this.flashAngle);
+          ctx.closePath();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fill();
+          ctx.restore();
+          ctx.globalCompositeOperation='source-over';
+        }
+
+        // draw ghosts and hunters
+        // draw player with stroke
+        for(const e of [...this.ghosts, this.player]){
+          if(e.type==='ghost'){
+            // ghost glow
+            drawGlowCircle(e.x+e.w/2, e.y+e.h/2, e.w*0.9, 'rgba(255,89,118,0.12)');
+            ctx.fillStyle = e.color; roundRect(ctx, e.x, e.y, e.w, e.h, 10);
+          } else {
+            drawGlowCircle(e.x+e.w/2, e.y+e.h/2, e.w*0.9, 'rgba(255,255,255,0.06)');
+            ctx.fillStyle = e.color; roundRect(ctx, e.x, e.y, e.w, e.h, 6);
+          }
+        }
+
+        // HUD
+        ctx.fillStyle='rgba(0,0,0,0.5)'; roundRect(ctx, 12,12,160,46,8);
+        ctx.fillStyle='#fff'; ctx.font='16px Arial'; ctx.fillText('Vai trò: '+(this.role==='hunter'?'Người bắt':'Ma'), 20, 34);
+        ctx.fillText('Thời gian: '+this.timer+'s', 20, 54);
+
+      }
+
+      showResult(){
+        if(this.resultShown) return;
+        this.resultShown=true;
+        const overlay = document.createElement('div'); overlay.className='overlay';
+        const title = document.createElement('h2'); const p = document.createElement('p');
+        // determine winner
+        let msg = '';
+        if(this.role==='hunter'){
+          if(this.caught) { msg = 'Bạn đã bắt được ma! Bạn thắng!'; }
+          else { msg = 'Hết giờ — Bạn thua! Ma chạy thoát.'; }
+        } else {
+          // you are ghost: if hunter bot caught any ghost (including you?) check
+          // we interpret: if hunter caught any ghost -> hunter wins; else ghosts win
+          if(this.caught) { msg = 'Hunter bắt được ma. Bạn thua!'; }
+          else { msg = 'Bạn (ma) đã sống sót. You Win!'; }
+        }
+        title.textContent = msg; p.textContent = 'Nhấn Restart để chơi lại.';
+        const b = document.createElement('button'); b.textContent='Restart'; b.onclick=()=>{ overlay.remove(); startGame(); };
+        overlay.appendChild(title); overlay.appendChild(p); overlay.appendChild(b);
+        gameWrap.appendChild(overlay);
+      }
+    }
+
+    /* ======= helper draw funcs ======= */
+    function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();ctx.fill();}
+    function drawGlowCircle(cx,cy,r,col){ctx.save();ctx.fillStyle=col;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();ctx.restore();}
+
+    /* ===== main loop ===== */
+    function loop(t){
+      if(!game) return;
+      const now = performance.now();
+      const dt = (now - game.lastUpdate)/1000; game.lastUpdate = now;
+      game.update(dt);
+      game.draw();
+      if(!game.running){
+        game.showResult();
+      }
+      requestAnimationFrame(loop);
+    }
+
+    /* ===== UI actions ===== */
+    function startGame(){
+      if(game) { game.initFromUI(); }
+      else { game = new Game(); game.initFromUI(); requestAnimationFrame(loop); }
+    }
+
+    startBtn.addEventListener('click', ()=>{ startGame(); });
+    resetBtn.addEventListener('click', ()=>{ location.reload(); });
+
+    // Start paused state with sample scene
+    game = new Game(); game.initFromUI(); game.running=false; game.draw();
+
+    // instructions overlay first time
+    const info = document.createElement('div'); info.className='overlay';
+    const t = document.createElement('h2'); t.textContent='Menu - Chọn vai trò & thời gian';
+    const p = document.createElement('p'); p.textContent='Chọn cấu hình ở bên phải, sau đó nhấn Bắt đầu.';
+    const b = document.createElement('button'); b.textContent='Bắt đầu (Start)'; b.onclick=()=>{ info.remove(); };
+    info.appendChild(t); info.appendChild(p); info.appendChild(b); gameWrap.appendChild(info);
+
+  </script>
+</body>
+</html>

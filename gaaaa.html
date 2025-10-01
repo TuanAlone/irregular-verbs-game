@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronos: Trận Chiến Thời Gian</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #ffcc00;
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+        
+        .game-area {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .player-area {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 300px;
+        }
+        
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .timeline-points {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ff9900;
+        }
+        
+        .energy {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .energy-dot {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #444;
+        }
+        
+        .energy-dot.active {
+            background: #00ccff;
+            box-shadow: 0 0 5px #00ccff;
+        }
+        
+        .zones {
+            margin-bottom: 15px;
+        }
+        
+        .zone {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+        
+        .zone-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #ffcc00;
+        }
+        
+        .cards-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            min-height: 60px;
+        }
+        
+        .card {
+            width: 80px;
+            height: 120px;
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-event {
+            background: linear-gradient(135deg, #1a2a6c, #3a7bd5);
+        }
+        
+        .card-manifestation {
+            background: linear-gradient(135deg, #8e0e00, #c04848);
+        }
+        
+        .card-fate {
+            background: linear-gradient(135deg, #8e7800, #ffcc00);
+        }
+        
+        .card-cost {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        
+        .card-name {
+            font-size: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        
+        .card-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+        
+        .card-description {
+            font-size: 9px;
+            text-align: center;
+            margin-top: 5px;
+        }
+        
+        .hand {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #ffcc00;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #ffdd55;
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: #2c5364;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #ffcc00;
+        }
+        
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            font-size: 14px;
+            padding: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chronos: Trận Chiến Thời Gian</h1>
+            <p>Bảo vệ Mốc thời gian Hiện tại của bạn và đánh bại đối thủ!</p>
+        </header>
+        
+        <div class="game-area">
+            <div class="player-area" id="player1-area">
+                <div class="player-header">
+                    <h2>Người chơi 1</h2>
+                    <div class="timeline-points" id="player1-timeline">20</div>
+                    <div class="energy" id="player1-energy">
+                        <span>Năng lượng: </span>
+                        <!-- Energy dots will be added here by JS -->
+                    </div>
+                </div>
+                
+                <div class="zones">
+                    <div class="zone">
+                        <div class="zone-title">Dòng thời gian Tương lai</div>
+                        <div class="cards-container" id="player1-future">
+                            <!-- Future timeline cards will be added here by JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="zone">
+                        <div class="zone-title">Hiện thân</div>
+                        <div class="cards-container" id="player1-manifestations">
+                            <!-- Manifestation cards will be added here by JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="zone">
+                        <div class="zone-title">Nghĩa trang Quá khứ</div>
+                        <div class="cards-container" id="player1-graveyard">
+                            <!-- Graveyard cards will be added here by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="player-area" id="player2-area">
+                <div class="player-header">
+                    <h2>Người chơi 2</h2>
+                    <div class="timeline-points" id="player2-timeline">20</div>
+                    <div class="energy" id="player2-energy">
+                        <span>Năng lượng: </span>
+                        <!-- Energy dots will be added here by JS -->
+                    </div>
+                </div>
+                
+                <div class="zones">
+                    <div class="zone">
+                        <div class="zone-title">Dòng thời gian Tương lai</div>
+                        <div class="cards-container" id="player2-future">
+                            <!-- Future timeline cards will be added here by JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="zone">
+                        <div class="zone-title">Hiện thân</div>
+                        <div class="cards-container" id="player2-manifestations">
+                            <!-- Manifestation cards will be added here by JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="zone">
+                        <div class="zone-title">Nghĩa trang Quá khứ</div>
+                        <div class="cards-container" id="player2-graveyard">
+                            <!-- Graveyard cards will be added here by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="hand">
+            <div class="zone-title">Bài trên tay</div>
+            <div class="cards-container" id="hand-cards">
+                <!-- Hand cards will be added here by JS -->
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="draw-btn">Rút bài</button>
+            <button id="end-turn-btn">Kết thúc lượt</button>
+            <button id="recall-btn">Kích hoạt Hồi tưởng</button>
+        </div>
+        
+        <div class="log" id="game-log">
+            <div class="log-entry">Trò chơi bắt đầu! Người chơi 1 đi trước.</div>
+        </div>
+    </div>
+    
+    <div class="modal" id="card-modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Chọn mục tiêu</h2>
+            <div id="modal-body">
+                <p>Bạn muốn làm gì với lá bài này?</p>
+            </div>
+            <div class="controls">
+                <button id="modal-play-btn">Đánh bài</button>
+                <button id="modal-cancel-btn">Hủy</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        const gameState = {
+            currentPlayer: 1,
+            players: {
+                1: {
+                    timelinePoints: 20,
+                    energy: 0,
+                    maxEnergy: 0,
+                    hand: [],
+                    futureTimeline: [],
+                    manifestations: [],
+                    graveyard: [],
+                    deck: []
+                },
+                2: {
+                    timelinePoints: 20,
+                    energy: 0,
+                    maxEnergy: 0,
+                    hand: [],
+                    futureTimeline: [],
+                    manifestations: [],
+                    graveyard: [],
+                    deck: []
+                }
+            },
+            selectedCard: null,
+            gameOver: false
+        };
+
+        // Card definitions
+        const cardDefinitions = [
+            {
+                id: 1,
+                name: "Tia Thời Gian",
+                type: "event",
+                cost: 2,
+                description: "Gây 3 điểm sát thương trực tiếp",
+                effect: (player, target) => {
+                    target.timelinePoints -= 3;
+                    addToLog(`Tia Thời Gian gây 3 điểm sát thương cho Người chơi ${target === gameState.players[1] ? 1 : 2}!`);
+                }
+            },
+            {
+                id: 2,
+                name: "Vệ binh Thời Gian",
+                type: "manifestation",
+                cost: 3,
+                attack: 2,
+                defense: 4,
+                description: "Khi triệu tập: đặt 1 bài từ Nghĩa trang vào Dòng thời gian",
+                effect: (player, target) => {
+                    if (player.graveyard.length > 0) {
+                        const card = player.graveyard.pop();
+                        player.futureTimeline.push(card);
+                        addToLog("Vệ binh Thời Gian đặt 1 lá bài từ Nghĩa trang vào Dòng thời gian Tương lai!");
+                    }
+                }
+            },
+            {
+                id: 3,
+                name: "Cơn Định Mệnh",
+                type: "fate",
+                cost: 4,
+                description: "Hủy diệt tất cả Hiện thân, mỗi lá gây 1 sát thương",
+                effect: (player, target) => {
+                    const totalManifestations = player.manifestations.length + target.manifestations.length;
+                    
+                    // Destroy all manifestations
+                    player.manifestations = [];
+                    target.manifestations = [];
+                    
+                    // Damage both players
+                    player.timelinePoints -= totalManifestations;
+                    target.timelinePoints -= totalManifestations;
+                    
+                    addToLog(`Cơn Định Mệnh hủy diệt ${totalManifestations} Hiện thân và gây ${totalManifestations} điểm sát thương cho cả hai người chơi!`);
+                }
+            },
+            {
+                id: 4,
+                name: "Lời Tiên Tri",
+                type: "fate",
+                cost: 1,
+                description: "Rút 2 lá bài",
+                effect: (player, target) => {
+                    drawCards(player, 2);
+                    addToLog("Lời Tiên Tri cho phép rút thêm 2 lá bài!");
+                }
+            },
+            {
+                id: 5,
+                name: "Kẻ Hủy Diệt",
+                type: "manifestation",
+                cost: 4,
+                attack: 4,
+                defense: 2,
+                description: "Khi bị tiêu diệt: gây 2 sát thương cho tất cả Hiện thân khác",
+                onDestroy: (player, target) => {
+                    // This would be implemented when destruction mechanics are added
+                }
+            },
+            {
+                id: 6,
+                name: "Bức Tường Thời Gian",
+                type: "event",
+                cost: 1,
+                description: "Giảm 2 sát thương nhận vào trong lượt này",
+                effect: (player, target) => {
+                    // This would be implemented with a damage reduction system
+                    addToLog("Bức Tường Thời Gian được kích hoạt! (Giảm 2 sát thương nhận vào trong lượt này)`);
+                }
+            }
+        ];
+
+        // Initialize game
+        function initGame() {
+            // Create decks for both players
+            for (let i = 1; i <= 2; i++) {
+                gameState.players[i].deck = [...cardDefinitions];
+                // Shuffle deck
+                gameState.players[i].deck.sort(() => Math.random() - 0.5);
+                
+                // Draw initial hand
+                drawCards(gameState.players[i], 5);
+            }
+            
+            // Player 1 starts
+            startTurn(1);
+            
+            // Render initial game state
+            renderGame();
+        }
+
+        // Draw cards for a player
+        function drawCards(player, count) {
+            for (let i = 0; i < count; i++) {
+                if (player.deck.length > 0) {
+                    const card = player.deck.pop();
+                    player.hand.push(card);
+                } else {
+                    // If deck is empty, realize future
+                    realizeFuture(player);
+                }
+            }
+        }
+
+        // Realize future when deck is empty
+        function realizeFuture(player) {
+            if (player.futureTimeline.length > 0) {
+                const fateCard = player.futureTimeline.shift();
+                addToLog(`Hiện thực hóa Tương lai: ${fateCard.name}!`);
+                
+                // Determine target (opponent)
+                const targetPlayer = player === gameState.players[1] ? gameState.players[2] : gameState.players[1];
+                
+                // Activate fate card effect
+                fateCard.effect(player, targetPlayer);
+                
+                // Move to graveyard
+                player.graveyard.push(fateCard);
+            } else {
+                addToLog("Không còn bài để rút và không có định mệnh nào trong Tương lai!");
+            }
+        }
+
+        // Start a player's turn
+        function startTurn(playerId) {
+            gameState.currentPlayer = playerId;
+            const player = gameState.players[playerId];
+            
+            // Increase max energy (capped at 10)
+            player.maxEnergy = Math.min(10, player.maxEnergy + 1);
+            player.energy = player.maxEnergy;
+            
+            addToLog(`Lượt của Người chơi ${playerId}. Năng lượng: ${player.energy}/${player.maxEnergy}`);
+            
+            // Render updated game state
+            renderGame();
+        }
+
+        // End current player's turn
+        function endTurn() {
+            const nextPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+            startTurn(nextPlayer);
+        }
+
+        // Play a card
+        function playCard(cardIndex, targetPlayerId) {
+            const player = gameState.players[gameState.currentPlayer];
+            const targetPlayer = gameState.players[targetPlayerId];
+            
+            if (cardIndex < 0 || cardIndex >= player.hand.length) {
+                addToLog("Lựa chọn không hợp lệ!");
+                return false;
+            }
+            
+            const card = player.hand[cardIndex];
+            
+            // Check energy
+            if (player.energy < card.cost) {
+                addToLog(`Không đủ năng lượng để đánh ${card.name}!`);
+                return false;
+            }
+            
+            // Pay energy cost
+            player.energy -= card.cost;
+            
+            if (card.type === "event") {
+                addToLog(`Người chơi ${gameState.currentPlayer} kích hoạt ${card.name}!`);
+                
+                // Activate event effect
+                card.effect(player, targetPlayer);
+                
+                // Move to graveyard
+                player.graveyard.push(card);
+                player.hand.splice(cardIndex, 1);
+                
+            } else if (card.type === "manifestation") {
+                addToLog(`Người chơi ${gameState.currentPlayer} triệu tập ${card.name}!`);
+                
+                // Activate on-summon effect if any
+                if (card.effect) {
+                    card.effect(player, targetPlayer);
+                }
+                
+                // Add to manifestations
+                player.manifestations.push(card);
+                player.hand.splice(cardIndex, 1);
+                
+            } else if (card.type === "fate") {
+                addToLog(`Người chơi ${gameState.currentPlayer} đặt ${card.name} vào Dòng thời gian Tương lai!`);
+                
+                // Add to future timeline
+                player.futureTimeline.push(card);
+                player.hand.splice(cardIndex, 1);
+            }
+            
+            // Check for game over
+            checkGameOver();
+            
+            // Render updated game state
+            renderGame();
+            
+            return true;
+        }
+
+        // Check if game is over
+        function checkGameOver() {
+            for (let i = 1; i <= 2; i++) {
+                if (gameState.players[i].timelinePoints <= 0) {
+                    gameSt
