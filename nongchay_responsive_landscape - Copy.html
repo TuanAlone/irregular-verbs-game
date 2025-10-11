@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô Phỏng Sự Nóng Chảy của Đồng</title>
+    <!-- Tích hợp Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tích hợp Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Phông chữ tùy chỉnh và các kiểu giao diện */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            overflow-y: auto; /* Ngăn thanh cuộn */
+        }
+        /* Kiểu tùy chỉnh cho các thẻ card */
+        .card {
+            background-color: #1a202c; /* Nền tối cho card */
+            border: 1px solid #2d3748;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0.06);
+        }
+        /* Kiểu cho thanh trượt */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4fd1c5; /* Màu xanh mòng két cho con trỏ */
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #1a202c;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4fd1c5;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #1a202c;
+        }
+    
+        /* Khi màn hình là điện thoại ngang, ép layout thành 2 cột */
+        @media screen and (max-width: 1024px) and (orientation: landscape) {
+            .responsive-grid {
+                grid-template-columns: 3fr 2fr !important; /* trái 3 phần, phải 2 phần */
+            }
+        }
+
+        /* --- Fix cho màn hình điện thoại --- */
+        /* Khi điện thoại dọc (portrait) ép toàn bộ về 1 cột */
+        @media screen and (max-width: 768px) and (orientation: portrait) {
+            body {
+                min-height: 100vh;   /* tránh bị cắt chiều cao */
+                height: auto;        /* cho phép cuộn */
+                flex-direction: column;
+                align-items: stretch;
+                justify-content: flex-start;
+            }
+
+            .responsive-grid {
+                grid-template-columns: 1fr !important; /* 1 cột */
+            }
+
+            .card {
+                padding: 1rem; /* giảm padding để vừa màn hình nhỏ */
+            }
+
+            canvas {
+                max-height: 250px;   /* giới hạn chiều cao canvas */
+            }
+        }
+
+        /* Khi điện thoại ngang (landscape, màn nhỏ) thu hẹp 2 cột */
+        @media screen and (max-width: 768px) and (orientation: landscape) {
+            body {
+                min-height: 100vh;
+                height: auto;
+                align-items: stretch;
+                justify-content: flex-start;
+            }
+
+            .responsive-grid {
+                grid-template-columns: 2fr 1fr !important; /* trái nhiều, phải ít */
+            }
+
+            .card {
+                padding: 1rem;
+            }
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <!-- Thay đổi từ lg thành md để ưu tiên giao diện ngang sớm hơn -->
+    <div class="w-full max-w-screen-2xl min-h-screen grid grid-cols-1 lg:grid-cols-5 gap-6 responsive-grid">
+
+        <!-- Cột trái: Mô phỏng phân tử (chiếm 3/5 không gian) -->
+        <div class="card flex flex-col flex-1 md:col-span-3">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-teal-300">Trạng Thái Phân Tử Đồng</h2>
+                <div id="temperature-display" class="text-lg font-semibold bg-gray-700 px-4 py-2 rounded-lg shadow-md">800°C</div>
+            </div>
+            <div class="flex-grow bg-gray-800 rounded-lg relative overflow-hidden">
+                <canvas id="moleculeCanvas" class="w-full h-full"></canvas>
+            </div>
+        </div>
+
+        <!-- Cột phải: Đồ thị và điều khiển (chiếm 2/5 không gian) -->
+        <div class="flex flex-col gap-6 flex-1 md:col-span-2">
+            <!-- Card chứa 2 đồ thị -->
+            <div class="card flex-1 flex flex-col min-h-0">
+                 <h2 class="text-xl font-bold text-teal-300 mb-2">Đồ Thị</h2>
+                 <div class="flex-grow grid grid-rows-2 gap-4">
+                    <div class="relative">
+                         <canvas id="temperatureChart"></canvas>
+                    </div>
+                    <div class="relative">
+                         <canvas id="internalEnergyChart"></canvas>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- Bảng điều khiển -->
+            <div class="card">
+                <h2 class="text-xl font-bold text-teal-300 mb-4">Bảng Điều Khiển</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-4">
+                    <button id="pauseButton" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-300">Tạm Dừng</button>
+                    <input type="range" id="timeSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer sm:col-span-2" min="0" max="1000" value="0">
+                </div>
+            </div>
+             <!-- Nút trở lại -->
+            <a href="index.html" class="w-full text-center bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300">
+                Trở Về Trang Chủ
+            </a>
+        </div>
+    </div>
+
+    <script>
+        /* --- Giữ nguyên phần JavaScript gốc của bạn --- */
+        // ...
+    </script>
+</body>
+</html>
